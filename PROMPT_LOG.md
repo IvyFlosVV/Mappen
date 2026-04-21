@@ -564,3 +564,14 @@ GET /api/profile — return current user's profile (id, username, invite_code, a
 PATCH /api/profile — update avatar_emoji and avatar_color
 
 Do not change any existing screens except: remove SIGN OUT from the map screen, and update the friends list to show avatars.
+
+##Colors modification
+Replace the avatar color palette in the Profile screen with these pastel colors:
+#F2A7BB, #B8D0E8, #A8DDD1, #E8A48C, #5B8F8A, #9B7BBF, #2E5490, #7D2340, #E87878, #8DC56A, #9E8880, #8B6BAE, #F0EFA0, #9B9BC8, #C47890
+Replace the existing color array with exactly these 15 values. Do not change anything else.
+
+##Detail tab modification
+A couple of fixes focusing on map page details tab:
+1. Remove the Cover indicator on the photo in a friend's tab.
+2. Add friend's Avatar and name in the detail tab if they are the owner of it.
+3. Currently, for a user's own pin, If you edit and add a photo you wouldn't be able to directly set it as the cover (SET indicator is not there) and it would appear if the user save one time and reopen edit. I would like the SET indicator to appear as soon as a picture is added.

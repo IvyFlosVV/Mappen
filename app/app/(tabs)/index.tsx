@@ -28,9 +28,11 @@ import { useFocusEffect } from 'expo-router';
 import { supabase } from '@/src/lib/supabase';
 import { useAuth } from '@/src/lib/auth';
 import { Fonts, RC } from '@/constants/theme';
+import { Avatar } from './profile';
 
 interface EntryPin {
   id: string;
+  user_id: string;
   latitude: number;
   longitude: number;
   title: string | null;
@@ -40,6 +42,9 @@ interface EntryPin {
   created_at: string;
   visibility: 'private' | 'friends';
   isFriend?: boolean;
+  ownerUsername?: string;
+  ownerAvatarEmoji?: string | null;
+  ownerAvatarColor?: string | null;
 }
 
 const PITTSBURGH = {
@@ -440,10 +445,15 @@ function PinSheet({
       quality: 0.8,
     });
     if (result.canceled) return;
-    setPendingUploads((prev) => [
-      ...prev,
-      ...result.assets.map((a) => ({ localUri: a.uri, uploading: false })),
-    ]);
+    const newAssets = result.assets.map((a) => ({ localUri: a.uri, uploading: false }));
+    setPendingUploads((prev) => {
+      const updated = [...prev, ...newAssets];
+      // Auto-set first added photo as cover if none is set yet
+      if (!draftCover && draftPhotos.length === 0 && updated.length > 0) {
+        setDraftCover(updated[0].localUri);
+      }
+      return updated;
+    });
   };
 
   const handleRemoveExistingPhoto = (url: string) => {
@@ -465,6 +475,7 @@ function PinSheet({
     try {
       const uploadedUrls: string[] = [];
       const updatedPending = [...pendingUploads];
+      const localToUploaded = new Map<string, string>();
 
       for (let i = 0; i < updatedPending.length; i++) {
         updatedPending[i] = { ...updatedPending[i], uploading: true };
@@ -481,12 +492,17 @@ function PinSheet({
         if (!error) {
           const { data } = supabase.storage.from('entry-photos').getPublicUrl(fileName);
           uploadedUrls.push(data.publicUrl);
+          localToUploaded.set(localUri, data.publicUrl);
         }
         updatedPending[i] = { ...updatedPending[i], uploading: false };
       }
 
       const finalPhotos = [...draftPhotos, ...uploadedUrls];
       let finalCover = draftCover;
+      // If the designated cover is a local URI (pending photo), resolve to uploaded URL
+      if (finalCover && localToUploaded.has(finalCover)) {
+        finalCover = localToUploaded.get(finalCover)!;
+      }
       if (finalCover && !finalPhotos.includes(finalCover)) finalCover = finalPhotos[0] ?? null;
       if (!finalCover && finalPhotos.length > 0) finalCover = finalPhotos[0];
 
@@ -597,6 +613,14 @@ function PinSheet({
         keyboardDismissMode="interactive"
         automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
       >
+        {/* ── Owner row (friend entries only) ── */}
+        {!isOwn && (
+          <View style={sheetStyles.ownerRow}>
+            <Avatar emoji={pin.ownerAvatarEmoji} color={pin.ownerAvatarColor} size={28} />
+            <Text style={sheetStyles.ownerName}>{pin.ownerUsername ?? 'Friend'}</Text>
+          </View>
+        )}
+
         {/* ── Metadata block ── */}
         <View style={sheetStyles.metaBlock}>
           <Text style={sheetStyles.meta}>{formatDate(pin.created_at)}</Text>
@@ -723,24 +747,40 @@ function PinSheet({
               );
             })}
 
-            {pendingUploads.map((p) => (
-              <View key={p.localUri} style={sheetStyles.galleryThumb}>
-                <Image source={{ uri: p.localUri }} style={sheetStyles.galleryThumbImg} resizeMode="cover" />
-                {p.uploading && (
-                  <View style={sheetStyles.thumbUploadOverlay}>
-                    <ActivityIndicator color={RC.parchment} size="small" />
-                  </View>
-                )}
-                {!p.uploading && (
-                  <TouchableOpacity
-                    style={sheetStyles.galleryRemove}
-                    onPress={() => handleRemovePending(p.localUri)}
-                  >
-                    <Text style={sheetStyles.galleryRemoveText}>✕</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            ))}
+            {pendingUploads.map((p) => {
+              const isPendingCover = p.localUri === draftCover;
+              return (
+                <View key={p.localUri} style={[sheetStyles.galleryThumb, isPendingCover && sheetStyles.galleryThumbCover]}>
+                  <Image source={{ uri: p.localUri }} style={sheetStyles.galleryThumbImg} resizeMode="cover" />
+                  {p.uploading ? (
+                    <View style={sheetStyles.thumbUploadOverlay}>
+                      <ActivityIndicator color={RC.parchment} size="small" />
+                    </View>
+                  ) : (
+                    <>
+                      {isPendingCover ? (
+                        <View style={sheetStyles.coverBadge}>
+                          <Text style={sheetStyles.coverBadgeText}>COVER</Text>
+                        </View>
+                      ) : (
+                        <TouchableOpacity style={sheetStyles.setCoverBtn} onPress={() => handleSetCover(p.localUri)}>
+                          <Text style={sheetStyles.setCoverText}>SET</Text>
+                        </TouchableOpacity>
+                      )}
+                      <TouchableOpacity
+                        style={sheetStyles.galleryRemove}
+                        onPress={() => {
+                          handleRemovePending(p.localUri);
+                          if (isPendingCover) setDraftCover(draftPhotos[0] ?? null);
+                        }}
+                      >
+                        <Text style={sheetStyles.galleryRemoveText}>✕</Text>
+                      </TouchableOpacity>
+                    </>
+                  )}
+                </View>
+              );
+            })}
 
             <TouchableOpacity style={sheetStyles.galleryAddTile} onPress={handleAddPhotos}>
               <Text style={sheetStyles.galleryAddIcon}>+</Text>
@@ -754,7 +794,7 @@ function PinSheet({
             contentContainerStyle={sheetStyles.galleryStrip}
           >
             {viewPhotos.map((url, idx) => {
-              const isCover = url === pin.photo_url;
+              const isCover = isOwn && url === pin.photo_url;
               return (
                 <TouchableOpacity
                   key={url}
@@ -921,6 +961,20 @@ const sheetStyles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 36,
     gap: 10,
+  },
+  ownerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 4,
+  },
+  ownerName: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: RC.graphite,
+    fontFamily: Fonts?.serif ?? 'Georgia',
+    letterSpacing: 0.3,
   },
   metaBlock: {
     borderLeftWidth: 2,
@@ -1184,7 +1238,7 @@ export default function MapScreen() {
     useCallback(() => {
       if (!session) return;
       (async () => {
-        const FIELDS = 'id, latitude, longitude, title, body, photo_url, photos, created_at, visibility';
+        const FIELDS = 'id, user_id, latitude, longitude, title, body, photo_url, photos, created_at, visibility';
 
         const [ownResult, friendResult] = await Promise.all([
           supabase
@@ -1205,13 +1259,28 @@ export default function MapScreen() {
           console.error('[MapScreen] failed to fetch friend entries:', friendResult.error.message);
         }
 
+        const friendEntries = (friendResult.data ?? []) as EntryPin[];
+        const friendUserIds = [...new Set(friendEntries.map((e) => e.user_id))];
+
+        let profileMap = new Map<string, { username: string; avatar_emoji: string | null; avatar_color: string | null }>();
+        if (friendUserIds.length > 0) {
+          const { data: profiles } = await supabase
+            .from('profiles')
+            .select('id, username, avatar_emoji, avatar_color')
+            .in('id', friendUserIds);
+          (profiles ?? []).forEach((p) => profileMap.set(p.id, p));
+        }
+
         const ownPins = ((ownResult.data ?? []) as EntryPin[]).map((p) => ({
           ...p,
           isFriend: false,
         }));
-        const friendPins = ((friendResult.data ?? []) as EntryPin[]).map((p) => ({
+        const friendPins = friendEntries.map((p) => ({
           ...p,
           isFriend: true,
+          ownerUsername: profileMap.get(p.user_id)?.username,
+          ownerAvatarEmoji: profileMap.get(p.user_id)?.avatar_emoji ?? null,
+          ownerAvatarColor: profileMap.get(p.user_id)?.avatar_color ?? null,
         }));
 
         setPins([...ownPins, ...friendPins]);

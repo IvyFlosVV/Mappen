@@ -30,16 +30,21 @@ const EMOJIS = [
 
 // 9 swatches that fit the cream/dark-green/dark-red palette
 const COLORS = [
-  '#1C3829', // hunter green
-  '#2A5240', // forest green
-  '#8C1A10', // ink red
-  '#B82929', // crimson
-  '#786F62', // dust / warm grey
-  '#3D3830', // graphite
-  '#7A5C18', // amber
-  '#4A3728', // dark umber
-  '#2E4A6E', // slate blue
-  '#5C3566', // plum
+  '#F2A7BB',
+  '#B8D0E8',
+  '#A8DDD1',
+  '#E8A48C',
+  '#5B8F8A',
+  '#9B7BBF',
+  '#2E5490',
+  '#7D2340',
+  '#E87878',
+  '#8DC56A',
+  '#9E8880',
+  '#8B6BAE',
+  '#F0EFA0',
+  '#9B9BC8',
+  '#C47890',
 ];
 
 const AVATAR_SIZE = 96;
@@ -125,11 +130,10 @@ async function patchProfile(
 export default function ProfileScreen() {
   const { session, signOut } = useAuth();
 
+  // Keep a ref so the focus callback is always stable (empty dep array),
+  // avoiding re-fires on every token refresh.
   const sessionRef = useRef(session);
   useEffect(() => { sessionRef.current = session; }, [session]);
-
-  // When true, the focus effect skips re-fetching so a save is never overwritten.
-  const isSavingRef = useRef(false);
 
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [selectedEmoji, setSelectedEmoji] = useState<string>(EMOJIS[0]);
@@ -140,32 +144,25 @@ export default function ProfileScreen() {
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
 
-  // Stable fetch function stored in a ref — never changes identity.
-  const loadProfile = useRef(() => {
-    if (isSavingRef.current) return;
-    const token = sessionRef.current?.access_token;
-    if (!token) return;
-    setLoading(true);
-    fetchProfile(token)
-      .then((data) => {
-        if (isSavingRef.current) return; // double-guard: skip if save started mid-flight
-        setProfile(data);
-        setSelectedEmoji(data.avatar_emoji ?? EMOJIS[0]);
-        setSelectedColor(data.avatar_color ?? COLORS[0]);
-        setDraftUsername(data.username ?? '');
-        setUsernameError('');
-        setDirty(false);
-      })
-      .catch((err: unknown) => {
-        console.error('[ProfileScreen]', err);
-      })
-      .finally(() => setLoading(false));
-  });
-
   useFocusEffect(
     useCallback(() => {
-      loadProfile.current();
-    }, []),
+      const token = sessionRef.current?.access_token;
+      if (!token) return;
+      setLoading(true);
+      fetchProfile(token)
+        .then((data) => {
+          setProfile(data);
+          setSelectedEmoji(data.avatar_emoji ?? EMOJIS[0]);
+          setSelectedColor(data.avatar_color ?? COLORS[0]);
+          setDraftUsername(data.username ?? '');
+          setUsernameError('');
+          setDirty(false);
+        })
+        .catch((err: unknown) => {
+          console.error('[ProfileScreen]', err);
+        })
+        .finally(() => setLoading(false));
+    }, []), // stable — never re-runs due to token refresh
   );
 
   const handleUsernameChange = (text: string) => {
@@ -195,20 +192,16 @@ export default function ProfileScreen() {
       setUsernameError('At least 2 characters required');
       return;
     }
-    isSavingRef.current = true;
     setSaving(true);
     try {
       const updated = await patchProfile(session.access_token, selectedEmoji, selectedColor, draftUsername);
       setProfile(updated);
-      setSelectedEmoji(updated.avatar_emoji ?? selectedEmoji);
-      setSelectedColor(updated.avatar_color ?? selectedColor);
       setDraftUsername(updated.username ?? draftUsername);
       setDirty(false);
     } catch (err: unknown) {
       Alert.alert('Save failed', err instanceof Error ? err.message : 'Something went wrong');
     } finally {
       setSaving(false);
-      isSavingRef.current = false;
     }
   };
 
