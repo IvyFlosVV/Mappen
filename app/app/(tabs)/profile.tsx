@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -6,6 +6,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -13,6 +14,7 @@ import { useFocusEffect } from 'expo-router';
 
 import { useAuth } from '@/src/lib/auth';
 import { Fonts, RC } from '@/constants/theme';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
@@ -101,6 +103,7 @@ async function patchProfile(
   token: string,
   emoji: string,
   color: string,
+  username: string,
 ): Promise<ProfileData> {
   const res = await fetch(`${API_URL}/api/profile`, {
     method: 'PATCH',
@@ -108,7 +111,7 @@ async function patchProfile(
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ avatar_emoji: emoji, avatar_color: color }),
+    body: JSON.stringify({ avatar_emoji: emoji, avatar_color: color, username }),
   });
   const json = await res.json();
   if (!res.ok) throw new Error(json.error ?? 'Failed to save profile');
@@ -122,30 +125,59 @@ async function patchProfile(
 export default function ProfileScreen() {
   const { session, signOut } = useAuth();
 
+  const sessionRef = useRef(session);
+  useEffect(() => { sessionRef.current = session; }, [session]);
+
+  // When true, the focus effect skips re-fetching so a save is never overwritten.
+  const isSavingRef = useRef(false);
+
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [selectedEmoji, setSelectedEmoji] = useState<string>(EMOJIS[0]);
   const [selectedColor, setSelectedColor] = useState<string>(COLORS[0]);
+  const [draftUsername, setDraftUsername] = useState<string>('');
+  const [usernameError, setUsernameError] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
 
+  // Stable fetch function stored in a ref — never changes identity.
+  const loadProfile = useRef(() => {
+    if (isSavingRef.current) return;
+    const token = sessionRef.current?.access_token;
+    if (!token) return;
+    setLoading(true);
+    fetchProfile(token)
+      .then((data) => {
+        if (isSavingRef.current) return; // double-guard: skip if save started mid-flight
+        setProfile(data);
+        setSelectedEmoji(data.avatar_emoji ?? EMOJIS[0]);
+        setSelectedColor(data.avatar_color ?? COLORS[0]);
+        setDraftUsername(data.username ?? '');
+        setUsernameError('');
+        setDirty(false);
+      })
+      .catch((err: unknown) => {
+        console.error('[ProfileScreen]', err);
+      })
+      .finally(() => setLoading(false));
+  });
+
   useFocusEffect(
     useCallback(() => {
-      if (!session?.access_token) return;
-      setLoading(true);
-      fetchProfile(session.access_token)
-        .then((data) => {
-          setProfile(data);
-          setSelectedEmoji(data.avatar_emoji ?? EMOJIS[0]);
-          setSelectedColor(data.avatar_color ?? COLORS[0]);
-          setDirty(false);
-        })
-        .catch((err: unknown) => {
-          console.error('[ProfileScreen]', err);
-        })
-        .finally(() => setLoading(false));
-    }, [session]),
+      loadProfile.current();
+    }, []),
   );
+
+  const handleUsernameChange = (text: string) => {
+    const filtered = text.replace(/[^a-zA-Z0-9_]/g, '');
+    setDraftUsername(filtered);
+    if (filtered.length > 0 && filtered.length < 2) {
+      setUsernameError('At least 2 characters required');
+    } else {
+      setUsernameError('');
+    }
+    setDirty(true);
+  };
 
   const handleSelectEmoji = (e: string) => {
     setSelectedEmoji(e);
@@ -159,15 +191,24 @@ export default function ProfileScreen() {
 
   const handleSave = async () => {
     if (!session?.access_token) return;
+    if (draftUsername.length < 2) {
+      setUsernameError('At least 2 characters required');
+      return;
+    }
+    isSavingRef.current = true;
     setSaving(true);
     try {
-      const updated = await patchProfile(session.access_token, selectedEmoji, selectedColor);
+      const updated = await patchProfile(session.access_token, selectedEmoji, selectedColor, draftUsername);
       setProfile(updated);
+      setSelectedEmoji(updated.avatar_emoji ?? selectedEmoji);
+      setSelectedColor(updated.avatar_color ?? selectedColor);
+      setDraftUsername(updated.username ?? draftUsername);
       setDirty(false);
     } catch (err: unknown) {
       Alert.alert('Save failed', err instanceof Error ? err.message : 'Something went wrong');
     } finally {
       setSaving(false);
+      isSavingRef.current = false;
     }
   };
 
@@ -201,17 +242,30 @@ export default function ProfileScreen() {
 
       {/* ── AVATAR DISPLAY ────────────────────────────────────────────── */}
       <View style={styles.avatarSection}>
-        <View style={styles.avatarFrame}>
-          <View
-            style={[
-              styles.avatarCircle,
-              { backgroundColor: selectedColor, width: AVATAR_SIZE, height: AVATAR_SIZE, borderRadius: AVATAR_SIZE / 2 },
-            ]}
-          >
-            <Text style={styles.avatarEmoji}>{selectedEmoji}</Text>
-          </View>
+        <View
+          style={[
+            styles.avatarCircle,
+            { backgroundColor: selectedColor, width: AVATAR_SIZE, height: AVATAR_SIZE, borderRadius: AVATAR_SIZE / 2 },
+          ]}
+        >
+          <Text style={styles.avatarEmoji}>{selectedEmoji}</Text>
         </View>
-        <Text style={styles.usernameDisplay}>{profile?.username ?? '—'}</Text>
+        <View style={[styles.usernameRow, usernameError ? styles.usernameRowError : null]}>
+          <TextInput
+            style={styles.usernameInput}
+            value={draftUsername}
+            onChangeText={handleUsernameChange}
+            placeholder="username"
+            placeholderTextColor={RC.dust}
+            autoCapitalize="none"
+            autoCorrect={false}
+            maxLength={30}
+          />
+          <IconSymbol name="pencil" size={14} color="#C8C4BE" />
+        </View>
+        {usernameError ? (
+          <Text style={styles.usernameErrorText}>{usernameError}</Text>
+        ) : null}
         <View style={styles.inviteCodeRow}>
           <Text style={styles.inviteLabel}>CODE</Text>
           <Text style={styles.inviteCode}>{profile?.invite_code?.toUpperCase() ?? '—'}</Text>
@@ -271,7 +325,7 @@ export default function ProfileScreen() {
         {saving ? (
           <ActivityIndicator size="small" color={RC.parchment} />
         ) : (
-          <Text style={styles.saveBtnText}>SAVE AVATAR</Text>
+          <Text style={styles.saveBtnText}>SAVE CHANGES</Text>
         )}
       </TouchableOpacity>
 
@@ -352,12 +406,6 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 4,
   },
-  avatarFrame: {
-    padding: 6,
-    borderWidth: 2.5,
-    borderColor: RC.hunter,
-    backgroundColor: RC.aged,
-  },
   avatarCircle: {
     justifyContent: 'center',
     alignItems: 'center',
@@ -366,13 +414,39 @@ const styles = StyleSheet.create({
     fontSize: 46,
     lineHeight: 58,
   },
-  usernameDisplay: {
-    fontSize: 22,
+  usernameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#C8C4BE',
+    marginTop: 4,
+    paddingBottom: 4,
+    gap: 6,
+    width: '100%',
+  },
+  usernameRowError: {
+    borderBottomColor: RC.inkRed,
+  },
+  usernameInput: {
+    fontSize: 20,
     fontWeight: '700',
     color: RC.ink,
-    letterSpacing: 3,
+    letterSpacing: 2,
+    fontFamily: Fonts?.serif ?? 'Georgia',
+    textAlign: 'center',
+    paddingVertical: 2,
+    paddingHorizontal: 4,
+    flexShrink: 1,
+    backgroundColor: 'transparent',
+  },
+  usernameErrorText: {
+    fontSize: 11,
+    color: RC.inkRed,
+    fontWeight: '700',
+    letterSpacing: 1,
     fontFamily: MONO,
-    marginTop: 4,
+    marginTop: 2,
   },
   inviteCodeRow: {
     flexDirection: 'row',

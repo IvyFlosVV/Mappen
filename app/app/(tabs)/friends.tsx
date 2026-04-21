@@ -442,7 +442,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: RC.ink,
     letterSpacing: 0.5,
-    fontFamily: MONO,
+    fontFamily: Fonts?.serif ?? 'Georgia',
     flex: 1,
   },
   friendCode: {

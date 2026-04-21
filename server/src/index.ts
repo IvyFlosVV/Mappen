@@ -95,16 +95,31 @@ app.get('/api/profile', requireAuth, async (req: AuthRequest, res) => {
 
 app.patch('/api/profile', requireAuth, async (req: AuthRequest, res) => {
   const userId = req.userId!;
-  const { avatar_emoji, avatar_color } = req.body as {
+  const { avatar_emoji, avatar_color, username } = req.body as {
     avatar_emoji?: string;
     avatar_color?: string;
+    username?: string;
   };
+
+  if (username !== undefined) {
+    if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+      res.status(400).json({ error: 'Username may only contain letters, numbers, and underscores' });
+      return;
+    }
+    if (username.length < 2 || username.length > 30) {
+      res.status(400).json({ error: 'Username must be between 2 and 30 characters' });
+      return;
+    }
+  }
 
   const client = makeUserClient(req.accessToken!);
 
+  const updates: Record<string, unknown> = { avatar_emoji, avatar_color };
+  if (username !== undefined) updates.username = username;
+
   const { data, error } = await client
     .from('profiles')
-    .update({ avatar_emoji, avatar_color })
+    .update(updates)
     .eq('id', userId)
     .select('id, username, invite_code, avatar_emoji, avatar_color')
     .single();
