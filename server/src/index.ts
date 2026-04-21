@@ -68,6 +68,56 @@ app.get('/health', (_req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// GET /api/profile  — current user's profile
+// ─────────────────────────────────────────────────────────────────────────────
+
+app.get('/api/profile', requireAuth, async (req: AuthRequest, res) => {
+  const userId = req.userId!;
+  const client = makeUserClient(req.accessToken!);
+
+  const { data, error } = await client
+    .from('profiles')
+    .select('id, username, invite_code, avatar_emoji, avatar_color')
+    .eq('id', userId)
+    .single();
+
+  if (error) {
+    res.status(500).json({ error: error.message });
+    return;
+  }
+
+  res.json(data);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PATCH /api/profile  — update avatar_emoji and avatar_color
+// ─────────────────────────────────────────────────────────────────────────────
+
+app.patch('/api/profile', requireAuth, async (req: AuthRequest, res) => {
+  const userId = req.userId!;
+  const { avatar_emoji, avatar_color } = req.body as {
+    avatar_emoji?: string;
+    avatar_color?: string;
+  };
+
+  const client = makeUserClient(req.accessToken!);
+
+  const { data, error } = await client
+    .from('profiles')
+    .update({ avatar_emoji, avatar_color })
+    .eq('id', userId)
+    .select('id, username, invite_code, avatar_emoji, avatar_color')
+    .single();
+
+  if (error) {
+    res.status(500).json({ error: error.message });
+    return;
+  }
+
+  res.json(data);
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // GET /api/friends  — accepted friends (with username + invite_code)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -97,7 +147,7 @@ app.get('/api/friends', requireAuth, async (req: AuthRequest, res) => {
 
   const { data: profiles, error: pErr } = await client
     .from('profiles')
-    .select('id, username, invite_code')
+    .select('id, username, invite_code, avatar_emoji, avatar_color')
     .in('id', friendIds);
 
   if (pErr) {

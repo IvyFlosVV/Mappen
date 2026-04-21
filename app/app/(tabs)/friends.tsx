@@ -17,6 +17,7 @@ import { useFocusEffect } from 'expo-router';
 import { useAuth } from '@/src/lib/auth';
 import { supabase } from '@/src/lib/supabase';
 import { Fonts, RC } from '@/constants/theme';
+import { Avatar } from './profile';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -26,6 +27,8 @@ interface FriendProfile {
   id: string;
   username: string;
   invite_code?: string;
+  avatar_emoji?: string | null;
+  avatar_color?: string | null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -217,7 +220,7 @@ export default function FriendsScreen() {
           {pending.map((person) => (
             <View key={person.id} style={styles.listRow}>
               <View style={styles.listRowLeft}>
-                <View style={styles.avatarDot} />
+                <Avatar emoji={person.avatar_emoji} color={person.avatar_color} size={30} />
                 <Text style={styles.listRowName}>{person.username}</Text>
               </View>
               <TouchableOpacity
@@ -249,7 +252,7 @@ export default function FriendsScreen() {
           {friends.map((friend) => (
             <View key={friend.id} style={[styles.listRow, styles.listRowFriend]}>
               <View style={styles.listRowLeft}>
-                <View style={[styles.avatarDot, styles.avatarDotFriend]} />
+                <Avatar emoji={friend.avatar_emoji} color={friend.avatar_color} size={30} />
                 <Text style={styles.listRowName}>{friend.username}</Text>
               </View>
               {friend.invite_code ? (
@@ -327,7 +330,7 @@ const styles = StyleSheet.create({
     backgroundColor: RC.heavyRule,
   },
   sectionLabel: {
-    fontSize: 9,
+    fontSize: 13,
     fontWeight: '700',
     color: RC.graphite,
     letterSpacing: 3,
@@ -364,7 +367,7 @@ const styles = StyleSheet.create({
     backgroundColor: RC.hunter,
   },
   copyBtnText: {
-    fontSize: 9,
+    fontSize: 13,
     fontWeight: '700',
     color: RC.hunter,
     letterSpacing: 1.5,
@@ -401,7 +404,7 @@ const styles = StyleSheet.create({
     opacity: 0.45,
   },
   addBtnText: {
-    fontSize: 10,
+    fontSize: 13,
     fontWeight: '700',
     color: RC.parchment,
     letterSpacing: 2,
@@ -434,15 +437,6 @@ const styles = StyleSheet.create({
     gap: 10,
     flex: 1,
   },
-  avatarDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: RC.inkRed,
-  },
-  avatarDotFriend: {
-    backgroundColor: RC.hunter,
-  },
   listRowName: {
     fontSize: 13,
     fontWeight: '700',
@@ -452,7 +446,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   friendCode: {
-    fontSize: 9,
+    fontSize: 13,
     color: RC.dust,
     letterSpacing: 2,
     fontFamily: MONO,
@@ -472,7 +466,7 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   acceptBtnText: {
-    fontSize: 9,
+    fontSize: 13,
     fontWeight: '700',
     color: RC.parchment,
     letterSpacing: 1.5,
@@ -488,7 +482,7 @@ const styles = StyleSheet.create({
     backgroundColor: RC.aged,
   },
   emptyNoteText: {
-    fontSize: 11,
+    fontSize: 13,
     color: RC.dust,
     letterSpacing: 1,
     fontFamily: MONO,

@@ -22,8 +22,7 @@ import { supabase } from '@/src/lib/supabase';
 import { Fonts, RC } from '@/constants/theme';
 
 // ============================================
-// STATE MACHINE — I will write this section myself.
-// Leave this block exactly as-is. Do not modify.
+// STATE MACHINE
 // ============================================
 
 // One photo in the multi-photo array.  `id` is a client-side UUID so uploads
@@ -33,16 +32,18 @@ type PhotoItem =
   | { id: string; phase: 'uploaded'; localUri: string; publicUrl: string }
   | { id: string; phase: 'error'; localUri: string; errorMessage: string };
 
+type Visibility = 'private' | 'friends';
+
 type State =
   | { status: 'idle' }
   | { status: 'fetching_gps' }
   | { status: 'gps_error'; message: string }
-  | { status: 'ready'; latitude: number; longitude: number; title: string; body: string; photos: PhotoItem[] }
-  | { status: 'refreshing_gps'; latitude: number; longitude: number; title: string; body: string; photos: PhotoItem[] }
-  | { status: 'checking_duplicate'; latitude: number; longitude: number; title: string; body: string; photos: PhotoItem[] }
-  | { status: 'duplicate_warning'; latitude: number; longitude: number; title: string; body: string; photos: PhotoItem[]; nearbyTitle: string | null }
-  | { status: 'submitting'; latitude: number; longitude: number; title: string; body: string; photos: PhotoItem[] }
-  | { status: 'submit_error'; latitude: number; longitude: number; title: string; body: string; message: string; photos: PhotoItem[] }
+  | { status: 'ready'; latitude: number; longitude: number; title: string; body: string; photos: PhotoItem[]; visibility: Visibility }
+  | { status: 'refreshing_gps'; latitude: number; longitude: number; title: string; body: string; photos: PhotoItem[]; visibility: Visibility }
+  | { status: 'checking_duplicate'; latitude: number; longitude: number; title: string; body: string; photos: PhotoItem[]; visibility: Visibility }
+  | { status: 'duplicate_warning'; latitude: number; longitude: number; title: string; body: string; photos: PhotoItem[]; nearbyTitle: string | null; visibility: Visibility }
+  | { status: 'submitting'; latitude: number; longitude: number; title: string; body: string; photos: PhotoItem[]; visibility: Visibility }
+  | { status: 'submit_error'; latitude: number; longitude: number; title: string; body: string; message: string; photos: PhotoItem[]; visibility: Visibility }
   | { status: 'success' };
 
 type Action =
@@ -53,6 +54,7 @@ type Action =
   | { type: 'REFRESH_GPS' }
   | { type: 'EDIT_TITLE'; value: string }
   | { type: 'EDIT_BODY'; value: string }
+  | { type: 'EDIT_VISIBILITY'; value: Visibility }
   | { type: 'SUBMIT' }
   | { type: 'SUBMIT_SUCCESS' }
   | { type: 'SUBMIT_FAIL'; message: string }
@@ -94,6 +96,7 @@ function reducer(state: State, action: Action): State {
         title: '',
         body: '',
         photos: [],
+        visibility: 'private',
       };
     }
 
@@ -127,6 +130,11 @@ function reducer(state: State, action: Action): State {
       return { ...state, body: action.value };
     }
 
+    case 'EDIT_VISIBILITY': {
+      if (state.status !== 'ready' && state.status !== 'submit_error') { return state; }
+      return { ...state, visibility: action.value };
+    }
+
     case 'SUBMIT': {
       if (state.status !== 'ready') { return state; }
       return {
@@ -136,6 +144,7 @@ function reducer(state: State, action: Action): State {
         title: state.title,
         body: state.body,
         photos: state.photos,
+        visibility: state.visibility,
       };
     }
 
@@ -158,6 +167,7 @@ function reducer(state: State, action: Action): State {
         title: state.title,
         body: state.body,
         photos: state.photos,
+        visibility: state.visibility,
       };
     }
 
@@ -170,6 +180,7 @@ function reducer(state: State, action: Action): State {
         title: state.title,
         body: state.body,
         photos: state.photos,
+        visibility: state.visibility,
       };
     }
 
@@ -182,6 +193,7 @@ function reducer(state: State, action: Action): State {
         title: state.title,
         body: state.body,
         photos: state.photos,
+        visibility: state.visibility,
       };
     }
 
@@ -200,6 +212,7 @@ function reducer(state: State, action: Action): State {
         body: state.body,
         message: action.message,
         photos: state.photos,
+        visibility: state.visibility,
       };
     }
 
@@ -264,10 +277,10 @@ function reducer(state: State, action: Action): State {
 // ─────────────────────────────────────────────────────────────────────────────
 
 type FormState =
-  | { status: 'ready'; latitude: number; longitude: number; title: string; body: string; photos: PhotoItem[] }
-  | { status: 'refreshing_gps'; latitude: number; longitude: number; title: string; body: string; photos: PhotoItem[] }
-  | { status: 'checking_duplicate'; latitude: number; longitude: number; title: string; body: string; photos: PhotoItem[] }
-  | { status: 'submitting'; latitude: number; longitude: number; title: string; body: string; photos: PhotoItem[] }
+  | { status: 'ready'; latitude: number; longitude: number; title: string; body: string; photos: PhotoItem[]; visibility: Visibility }
+  | { status: 'refreshing_gps'; latitude: number; longitude: number; title: string; body: string; photos: PhotoItem[]; visibility: Visibility }
+  | { status: 'checking_duplicate'; latitude: number; longitude: number; title: string; body: string; photos: PhotoItem[]; visibility: Visibility }
+  | { status: 'submitting'; latitude: number; longitude: number; title: string; body: string; photos: PhotoItem[]; visibility: Visibility }
   | {
       status: 'submit_error';
       latitude: number;
@@ -276,6 +289,7 @@ type FormState =
       body: string;
       message: string;
       photos: PhotoItem[];
+      visibility: Visibility;
     };
 
 // ── Photo strip ──────────────────────────────────────────────────────────────
@@ -410,6 +424,49 @@ function renderForm(
         <View style={styles.sectionDivider} />
 
         {renderPhotoStrip(state.photos, dispatch, isSubmitting, onPickPhotos)}
+
+        <View style={styles.sectionDivider} />
+
+        {/* Visibility toggle */}
+        <View style={styles.visibilityRow}>
+          <Text style={styles.visibilityLabel}>VISIBILITY</Text>
+          <View style={styles.visibilityToggle}>
+            <TouchableOpacity
+              style={[
+                styles.visibilityOption,
+                state.visibility === 'private' && styles.visibilityOptionActive,
+              ]}
+              onPress={() => dispatch({ type: 'EDIT_VISIBILITY', value: 'private' })}
+              disabled={isSubmitting}
+            >
+              <Text
+                style={[
+                  styles.visibilityOptionText,
+                  state.visibility === 'private' && styles.visibilityOptionTextActive,
+                ]}
+              >
+                PRIVATE
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.visibilityOption,
+                state.visibility === 'friends' && styles.visibilityOptionActiveFriends,
+              ]}
+              onPress={() => dispatch({ type: 'EDIT_VISIBILITY', value: 'friends' })}
+              disabled={isSubmitting}
+            >
+              <Text
+                style={[
+                  styles.visibilityOptionText,
+                  state.visibility === 'friends' && styles.visibilityOptionTextActive,
+                ]}
+              >
+                FRIENDS
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
 
         <TouchableOpacity
           style={[styles.primaryButton, isSubmitting && styles.buttonDisabled]}
@@ -701,7 +758,7 @@ export default function NewEntryScreen() {
     if (state.status !== 'submitting') return;
 
     let cancelled = false;
-    const { latitude, longitude, title, body, photos } = state;
+    const { latitude, longitude, title, body, photos, visibility } = state;
 
     (async () => {
       const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -724,7 +781,7 @@ export default function NewEntryScreen() {
         body: body.trim() || null,
         photo_url: uploadedUrls[0] ?? null,
         photos: uploadedUrls,
-        visibility: 'private',
+        visibility,
       });
 
       if (cancelled) return;
@@ -794,7 +851,7 @@ const styles = StyleSheet.create({
     gap: 22,
   },
   mutedText: {
-    fontSize: 11,
+    fontSize: 13,
     color: RC.dust,
     letterSpacing: 2,
     fontWeight: '700',
@@ -869,7 +926,7 @@ const styles = StyleSheet.create({
     backgroundColor: RC.inkRed,
   },
   sectionHeaderText: {
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '700',
     color: RC.ink,
     letterSpacing: 3,
@@ -886,7 +943,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   errorBannerText: {
-    fontSize: 12,
+    fontSize: 13,
     color: RC.inkRed,
     fontFamily: Fonts?.mono ?? 'Courier New',
     letterSpacing: 0.3,
@@ -961,9 +1018,9 @@ const styles = StyleSheet.create({
   buttonDisabled: { opacity: 0.5 },
   primaryButtonText: {
     color: '#F5F2E7',
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
-    letterSpacing: 2.5,
+    letterSpacing: 2,
   },
   secondaryButton: {
     height: 54,
@@ -974,7 +1031,7 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: {
     color: '#F5F2E7',
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '700',
     letterSpacing: 2,
   },
@@ -1015,9 +1072,9 @@ const styles = StyleSheet.create({
   },
   warnButtonText: {
     color: '#F5F2E7',
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
-    letterSpacing: 2.5,
+    letterSpacing: 2,
   },
 
   // ── photo strip ──
@@ -1053,7 +1110,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  thumbRemoveText: { color: '#fff', fontSize: 11, fontWeight: '700' },
+  thumbRemoveText: { color: '#fff', fontSize: 13, fontWeight: '700' },
   photoAddTile: {
     width: THUMB_SIZE,
     height: THUMB_SIZE,
@@ -1071,11 +1128,51 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   photoAddLabel: {
-    fontSize: 9,
+    fontSize: 13,
     color: RC.dust,
     textAlign: 'center',
-    lineHeight: 13,
+    lineHeight: 16,
     letterSpacing: 0.8,
     fontWeight: '700',
+  },
+  visibilityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 4,
+  },
+  visibilityLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: RC.dust,
+    letterSpacing: 2,
+    fontFamily: Fonts?.mono ?? 'Courier New',
+  },
+  visibilityToggle: {
+    flexDirection: 'row',
+    borderWidth: 1.5,
+    borderColor: RC.heavyRule,
+    overflow: 'hidden',
+  },
+  visibilityOption: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: RC.aged,
+  },
+  visibilityOptionActive: {
+    backgroundColor: RC.hunter,
+  },
+  visibilityOptionActiveFriends: {
+    backgroundColor: RC.inkRed,
+  },
+  visibilityOptionText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: RC.dust,
+    letterSpacing: 1.5,
+    fontFamily: Fonts?.mono ?? 'Courier New',
+  },
+  visibilityOptionTextActive: {
+    color: RC.parchment,
   },
 });

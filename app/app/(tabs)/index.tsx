@@ -38,6 +38,7 @@ interface EntryPin {
   photo_url: string | null;
   photos: string[];
   created_at: string;
+  visibility: 'private' | 'friends';
   isFriend?: boolean;
 }
 
@@ -97,7 +98,7 @@ function EntryMarker({
     >
       {pin.photo_url ? (
         // Photo marker: square frame with accent-colored border
-        <View style={{ alignItems: 'center' }}>
+          <View style={{ alignItems: 'center' }}>
           <View
             style={{
               width: 58,
@@ -125,7 +126,7 @@ function EntryMarker({
               maxWidth: 120,
             }}>
               <Text
-                style={{ fontSize: 9, fontWeight: '700', color: RC.parchment, letterSpacing: 0.8 }}
+                style={{ fontSize: 11, fontWeight: '700', color: RC.parchment, letterSpacing: 0.8 }}
                 numberOfLines={1}
               >{pin.title}</Text>
             </View>
@@ -170,7 +171,7 @@ function EntryMarker({
               maxWidth: 120,
             }}>
               <Text
-                style={{ fontSize: 9, fontWeight: '700', color: RC.parchment, letterSpacing: 0.8 }}
+                style={{ fontSize: 11, fontWeight: '700', color: RC.parchment, letterSpacing: 0.8 }}
                 numberOfLines={1}
               >{pin.title}</Text>
             </View>
@@ -336,7 +337,7 @@ const viewerStyles = StyleSheet.create({
   },
   counterText: {
     color: RC.parchment,
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '700',
     letterSpacing: 1,
   },
@@ -355,7 +356,7 @@ const viewerStyles = StyleSheet.create({
   },
   savedLabel: {
     color: RC.parchment,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
     letterSpacing: 0.5,
     paddingBottom: 6,
@@ -411,6 +412,7 @@ function PinSheet({
   const [editing, setEditing] = useState(false);
   const [draftTitle, setDraftTitle] = useState(pin.title ?? '');
   const [draftBody, setDraftBody] = useState(pin.body ?? '');
+  const [draftVisibility, setDraftVisibility] = useState<'private' | 'friends'>(pin.visibility ?? 'private');
   const [draftPhotos, setDraftPhotos] = useState<string[]>(allPhotosForPin(pin));
   const [draftCover, setDraftCover] = useState<string | null>(pin.photo_url);
   const [pendingUploads, setPendingUploads] = useState<Array<{ localUri: string; uploading: boolean }>>([]);
@@ -419,6 +421,7 @@ function PinSheet({
   const startEdit = () => {
     setDraftTitle(pin.title ?? '');
     setDraftBody(pin.body ?? '');
+    setDraftVisibility(pin.visibility ?? 'private');
     setDraftPhotos(allPhotosForPin(pin));
     setDraftCover(pin.photo_url);
     setPendingUploads([]);
@@ -494,6 +497,7 @@ function PinSheet({
           body: draftBody.trim() || null,
           photo_url: finalCover,
           photos: finalPhotos,
+          visibility: draftVisibility,
         })
         .eq('id', pin.id);
 
@@ -508,6 +512,7 @@ function PinSheet({
         body: draftBody.trim() || null,
         photo_url: finalCover,
         photos: finalPhotos,
+        visibility: draftVisibility,
       });
       setEditing(false);
       setPendingUploads([]);
@@ -627,6 +632,60 @@ function PinSheet({
           />
         ) : (
           pin.body ? <Text style={sheetStyles.body}>{pin.body}</Text> : null
+        )}
+
+        {/* ── Visibility toggle (edit) / badge (view) ── */}
+        {editing ? (
+          <View style={sheetStyles.visibilityRow}>
+            <Text style={sheetStyles.visibilityLabel}>VISIBILITY</Text>
+            <View style={sheetStyles.visibilityToggle}>
+              <TouchableOpacity
+                style={[
+                  sheetStyles.visibilityOption,
+                  draftVisibility === 'private' && sheetStyles.visibilityOptionActive,
+                ]}
+                onPress={() => setDraftVisibility('private')}
+              >
+                <Text
+                  style={[
+                    sheetStyles.visibilityOptionText,
+                    draftVisibility === 'private' && sheetStyles.visibilityOptionTextActive,
+                  ]}
+                >
+                  PRIVATE
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  sheetStyles.visibilityOption,
+                  draftVisibility === 'friends' && sheetStyles.visibilityOptionActiveFriends,
+                ]}
+                onPress={() => setDraftVisibility('friends')}
+              >
+                <Text
+                  style={[
+                    sheetStyles.visibilityOptionText,
+                    draftVisibility === 'friends' && sheetStyles.visibilityOptionTextActive,
+                  ]}
+                >
+                  FRIENDS
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : (
+          <View style={sheetStyles.visibilityBadgeRow}>
+            <View
+              style={[
+                sheetStyles.visibilityBadge,
+                pin.visibility === 'friends' && sheetStyles.visibilityBadgeFriends,
+              ]}
+            >
+              <Text style={sheetStyles.visibilityBadgeText}>
+                {pin.visibility === 'friends' ? 'FRIENDS' : 'PRIVATE'}
+              </Text>
+            </View>
+          </View>
         )}
 
         {/* ── Divider before photos ── */}
@@ -764,7 +823,7 @@ const sheetStyles = StyleSheet.create({
     borderBottomColor: RC.heavyRule,
   },
   headerLabel: {
-    fontSize: 9,
+    fontSize: 13,
     fontWeight: '700',
     color: RC.dust,
     letterSpacing: 3,
@@ -789,7 +848,7 @@ const sheetStyles = StyleSheet.create({
     alignItems: 'center',
   },
   headerBtnText: {
-    fontSize: 10,
+    fontSize: 13,
     color: '#F5F2E7',
     fontWeight: '700',
     letterSpacing: 1.5,
@@ -799,7 +858,7 @@ const sheetStyles = StyleSheet.create({
   },
   // kept for non-edit close button fallback
   headerAction: {
-    fontSize: 10,
+    fontSize: 13,
     color: RC.dust,
     fontWeight: '700',
     letterSpacing: 1.5,
@@ -807,7 +866,7 @@ const sheetStyles = StyleSheet.create({
     paddingVertical: 4,
   },
   saveAction: {
-    fontSize: 10,
+    fontSize: 13,
     color: RC.hunter,
     fontWeight: '700',
     letterSpacing: 1.5,
@@ -832,12 +891,12 @@ const sheetStyles = StyleSheet.create({
     borderColor: RC.hunter,
   },
   closeBtnText: {
-    fontSize: 11,
+    fontSize: 13,
     color: RC.graphite,
     fontWeight: '700',
   },
   editBtnText: {
-    fontSize: 10,
+    fontSize: 13,
     color: RC.graphite,
     fontWeight: '700',
     letterSpacing: 0.8,
@@ -847,7 +906,7 @@ const sheetStyles = StyleSheet.create({
     borderLeftWidth: 2.5,
   },
   deleteBtnText: {
-    fontSize: 10,
+    fontSize: 13,
     color: RC.inkRed,
     fontWeight: '700',
     letterSpacing: 0.8,
@@ -925,7 +984,7 @@ const sheetStyles = StyleSheet.create({
     alignItems: 'center',
   },
   addPhotoBtnText: {
-    fontSize: 11,
+    fontSize: 13,
     color: RC.hunter,
     fontWeight: '700',
     letterSpacing: 2,
@@ -956,7 +1015,7 @@ const sheetStyles = StyleSheet.create({
   },
   coverBadgeText: {
     color: RC.parchment,
-    fontSize: 8,
+    fontSize: 11,
     fontWeight: '700',
     letterSpacing: 1.2,
   },
@@ -970,7 +1029,7 @@ const sheetStyles = StyleSheet.create({
   },
   setCoverText: {
     color: RC.parchment,
-    fontSize: 8,
+    fontSize: 11,
     fontWeight: '700',
     letterSpacing: 1,
   },
@@ -986,7 +1045,7 @@ const sheetStyles = StyleSheet.create({
   },
   galleryRemoveText: {
     color: '#fff',
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '700',
   },
   thumbUploadOverlay: {
@@ -1012,10 +1071,10 @@ const sheetStyles = StyleSheet.create({
     fontWeight: '700',
   },
   galleryAddLabel: {
-    fontSize: 9,
+    fontSize: 13,
     color: RC.dust,
     textAlign: 'center',
-    lineHeight: 12,
+    lineHeight: 16,
     letterSpacing: 0.8,
     fontWeight: '700',
   },
@@ -1027,10 +1086,70 @@ const sheetStyles = StyleSheet.create({
     backgroundColor: RC.linen,
   },
   friendBadgeText: {
-    fontSize: 9,
+    fontSize: 13,
     color: RC.inkRed,
     fontWeight: '700',
     letterSpacing: 1.5,
+  },
+  visibilityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  visibilityLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: RC.dust,
+    letterSpacing: 2,
+    fontFamily: Fonts?.mono ?? 'Courier New',
+  },
+  visibilityToggle: {
+    flexDirection: 'row',
+    borderWidth: 1.5,
+    borderColor: RC.heavyRule,
+    overflow: 'hidden',
+  },
+  visibilityOption: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    backgroundColor: RC.aged,
+  },
+  visibilityOptionActive: {
+    backgroundColor: RC.hunter,
+  },
+  visibilityOptionActiveFriends: {
+    backgroundColor: RC.inkRed,
+  },
+  visibilityOptionText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: RC.dust,
+    letterSpacing: 1.5,
+    fontFamily: Fonts?.mono ?? 'Courier New',
+  },
+  visibilityOptionTextActive: {
+    color: RC.parchment,
+  },
+  visibilityBadgeRow: {
+    flexDirection: 'row',
+  },
+  visibilityBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: RC.rule,
+    backgroundColor: RC.aged,
+  },
+  visibilityBadgeFriends: {
+    borderColor: RC.hunter,
+    backgroundColor: RC.hunter,
+  },
+  visibilityBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: RC.dust,
+    letterSpacing: 1.5,
+    fontFamily: Fonts?.mono ?? 'Courier New',
   },
 });
 
@@ -1039,7 +1158,7 @@ const sheetStyles = StyleSheet.create({
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function MapScreen() {
-  const { session, signOut } = useAuth();
+  const { session } = useAuth();
   const mapRef = useRef<MapView>(null);
   const [pins, setPins] = useState<EntryPin[]>([]);
   const [locating, setLocating] = useState(false);
@@ -1065,7 +1184,7 @@ export default function MapScreen() {
     useCallback(() => {
       if (!session) return;
       (async () => {
-        const FIELDS = 'id, latitude, longitude, title, body, photo_url, photos, created_at';
+        const FIELDS = 'id, latitude, longitude, title, body, photo_url, photos, created_at, visibility';
 
         const [ownResult, friendResult] = await Promise.all([
           supabase
@@ -1183,13 +1302,6 @@ export default function MapScreen() {
         </TouchableOpacity>
       )}
 
-      {/* Sign-out — top right */}
-      <TouchableOpacity
-        style={[styles.signOutButton, Platform.OS === 'ios' && styles.signOutButtonIos]}
-        onPress={() => signOut()}
-      >
-        <Text style={styles.signOutText}>SIGN OUT</Text>
-      </TouchableOpacity>
     </View>
   );
 }
@@ -1238,21 +1350,4 @@ const styles = StyleSheet.create({
   fabIos: { bottom: 40 },
   fabText: { fontSize: 22, color: RC.parchment, lineHeight: 26 },
 
-  signOutButton: {
-    position: 'absolute',
-    top: 52,
-    right: 16,
-    backgroundColor: 'rgba(244,237,216,0.96)',
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderWidth: 1.5,
-    borderColor: RC.hunter,
-  },
-  signOutButtonIos: { top: 60 },
-  signOutText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: RC.hunter,
-    letterSpacing: 1.5,
-  },
 });

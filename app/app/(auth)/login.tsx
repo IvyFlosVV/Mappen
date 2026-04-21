@@ -134,12 +134,12 @@ const styles = StyleSheet.create({
     fontSize: 44,
     fontWeight: '700',
     color: RC.ink,
-    letterSpacing: 10,
+    letterSpacing: 3,
   },
   subtitle: {
-    fontSize: 9,
+    fontSize: 13,
     color: RC.dust,
-    letterSpacing: 3.5,
+    letterSpacing: 3,
     fontWeight: '700',
     marginBottom: 4,
   },
@@ -171,7 +171,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: RC.inkRed,
-    fontSize: 12,
+    fontSize: 13,
     fontFamily: Fonts?.mono ?? 'Courier New',
     flex: 1,
     letterSpacing: 0.3,
@@ -186,7 +186,7 @@ const styles = StyleSheet.create({
   buttonDisabled: { opacity: 0.5 },
   buttonText: {
     color: RC.parchment,
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '700',
     letterSpacing: 3,
   },
@@ -196,7 +196,7 @@ const styles = StyleSheet.create({
   },
   linkText: {
     color: RC.dust,
-    fontSize: 9,
+    fontSize: 13,
     letterSpacing: 1.5,
     fontWeight: '700',
   },

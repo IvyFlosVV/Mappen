@@ -517,10 +517,50 @@ When fetching entries for the map, also fetch accepted friends' entries where vi
 Use the existing Supabase auth for user identity. All endpoints should verify the JWT from the Authorization header. Do not change any existing screens or styling.
 
 
-#Debug
+##Debug
 [FriendsScreen] is throwing "Network request failed" on fetchFriendsData (friends.tsx:95). This is a network-level failure, not an HTTP error. Debug in this order:
 Log the exact URL being fetched in fetchFriendsData right before the fetch call
 Check that the base URL in the API config points to the correct Render backend URL (not localhost) when running on a physical device
 Check that the /api/friends endpoint exists in the Express router and is mounted correctly in server.js/index.js
 Check that the JWT from Supabase session is being attached as Authorization: Bearer <token> in the request headers
 Fix whichever of these is the root cause. Do not change any other behavior.
+
+#friend pins:
+ I need a visibility toggle on entry creation (and editing) — add a "Visible to friends / Private" control in new-entry.tsx so entries can be saved with visibility: 'friends'. Same in the edit sheet in index.tsx.
+Confirm the friendship row is accepted — run this in the Supabase SQL editor to verify:
+SELECT user_a, user_b, status, requester_id FROM public.friendships;
+If the row shows pending, the accept call either failed or the server wasn't running when it was made.
+
+#remove default Explore tab
+Remove the Explore tab entirely from the bottom navigation. Delete or repurpose app/(tabs)/explore.tsx. The tab bar should now have 3 tabs: Map, New Entry, Friends. Do not change anything else.
+
+#adding profile page
+Create a Profile screen for Mappen. Add it as a 4th tab in the bottom nav with a person icon.
+Avatar system:
+
+User picks one emoji from a preset list (🐶🐱🐭🐹🐰🦊🐻🐼🐻‍❄️🐨🐯🦁🐮🐷🐸🐵🐧🐦🐤🦄🐺🐴🦋🐝🐬🐟🐍🦀🐳🐙) and one background color from a preset palette (8-10 colors that fit the app's cream/dark green/dark red aesthetic)
+Avatar = colored circle with emoji centered inside
+Save avatar_emoji and avatar_color to the profiles table in Supabase via PATCH /api/profile
+Load on mount via GET /api/profile
+
+Profile screen layout (match existing 复古构成主义 style):
+
+Large avatar display at top, tap to edit
+Username display (read-only, set at signup)
+Emoji picker row (horizontally scrollable)
+Color picker row (color swatches)
+SAVE button
+SIGN OUT button (move it here from the map screen)
+
+Friends page integration:
+
+Each friend row should show their avatar (colored circle + emoji) and username
+If a friend has no avatar set yet, show a grey circle with a ?
+
+Backend:
+Add avatar_emoji (text) and avatar_color (text) columns to the profiles table in Supabase, then add:
+
+GET /api/profile — return current user's profile (id, username, invite_code, avatar_emoji, avatar_color)
+PATCH /api/profile — update avatar_emoji and avatar_color
+
+Do not change any existing screens except: remove SIGN OUT from the map screen, and update the friends list to show avatars.
