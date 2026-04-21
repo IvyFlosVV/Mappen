@@ -47,6 +47,15 @@ export default function TabLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="friends"
+        options={{
+          title: 'Friends',
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={22} name="person.2.fill" color={color} />
+          ),
+        }}
+      />
     </Tabs>
   );
 }

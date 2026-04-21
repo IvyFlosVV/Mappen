@@ -86,13 +86,16 @@ CREATE TRIGGER entries_set_updated_at
 -- 3. friendships
 --    Canonical row always has user_a < user_b (uuid ordering).
 --    This eliminates duplicate-direction rows at the DB level.
+--    requester_id tracks who initiated so the API can surface
+--    "incoming" vs "outgoing" pending requests.
 -- ============================================================
 CREATE TABLE IF NOT EXISTS public.friendships (
-  user_a     uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-  user_b     uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-  status     text NOT NULL DEFAULT 'pending'
-             CHECK (status IN ('pending', 'accepted')),
-  created_at timestamptz NOT NULL DEFAULT now(),
+  user_a        uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  user_b        uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  status        text NOT NULL DEFAULT 'pending'
+                CHECK (status IN ('pending', 'accepted')),
+  requester_id  uuid REFERENCES public.profiles(id) ON DELETE CASCADE,
+  created_at    timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (user_a, user_b),
   CHECK (user_a < user_b)   -- enforce canonical ordering
 );

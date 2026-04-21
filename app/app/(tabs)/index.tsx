@@ -38,6 +38,7 @@ interface EntryPin {
   photo_url: string | null;
   photos: string[];
   created_at: string;
+  isFriend?: boolean;
 }
 
 const PITTSBURGH = {
@@ -85,6 +86,9 @@ function EntryMarker({
     setTimeout(() => setTracksViews(false), 100);
   };
 
+  // Own pins: hunter (dark green). Friend pins: inkRed (dark red).
+  const accent = pin.isFriend ? RC.inkRed : RC.hunter;
+
   return (
     <Marker
       coordinate={{ latitude: pin.latitude, longitude: pin.longitude }}
@@ -92,14 +96,14 @@ function EntryMarker({
       onPress={() => onPress(pin)}
     >
       {pin.photo_url ? (
-        // Photo marker: square frame with hunter-green border
+        // Photo marker: square frame with accent-colored border
         <View style={{ alignItems: 'center' }}>
           <View
             style={{
               width: 58,
               height: 58,
               borderWidth: 3,
-              borderColor: RC.hunter,
+              borderColor: accent,
               overflow: 'hidden',
               backgroundColor: RC.parchment,
             }}
@@ -112,10 +116,10 @@ function EntryMarker({
             />
           </View>
           {/* Precise connector shaft */}
-          <View style={{ width: 3, height: 7, backgroundColor: RC.hunter }} />
+          <View style={{ width: 3, height: 7, backgroundColor: accent }} />
           {pin.title ? (
             <View style={{
-              backgroundColor: RC.hunter,
+              backgroundColor: accent,
               paddingHorizontal: 6,
               paddingVertical: 2,
               maxWidth: 120,
@@ -128,14 +132,14 @@ function EntryMarker({
           ) : null}
         </View>
       ) : (
-        // Text-only marker: ink-red teardrop with parchment border
+        // Text-only marker: accent-colored teardrop with parchment border
         <View style={{ alignItems: 'center' }}>
           <View
             style={{
               width: 26,
               height: 26,
               borderRadius: 13,
-              backgroundColor: RC.inkRed,
+              backgroundColor: accent,
               borderWidth: 2.5,
               borderColor: RC.parchment,
               shadowColor: RC.ink,
@@ -153,14 +157,14 @@ function EntryMarker({
               borderTopWidth: 8,
               borderLeftColor: 'transparent',
               borderRightColor: 'transparent',
-              borderTopColor: RC.inkRed,
+              borderTopColor: accent,
               marginTop: -1,
             }}
           />
           {pin.title ? (
             <View style={{
               marginTop: 2,
-              backgroundColor: RC.inkRed,
+              backgroundColor: accent,
               paddingHorizontal: 6,
               paddingVertical: 2,
               maxWidth: 120,
@@ -394,11 +398,13 @@ function PinSheet({
   onClose,
   onDelete,
   onSave,
+  isOwn = true,
 }: {
   pin: EntryPin;
   onClose: () => void;
   onDelete: (pin: EntryPin) => void;
   onSave: (updated: EntryPin) => void;
+  isOwn?: boolean;
 }) {
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
 
@@ -528,7 +534,7 @@ function PinSheet({
 
       {/* ── Header row ── */}
       <View style={sheetStyles.headerRow}>
-        {editing ? (
+        {isOwn && editing ? (
           <TouchableOpacity
             style={sheetStyles.headerCancelBtn}
             onPress={cancelEdit}
@@ -545,7 +551,7 @@ function PinSheet({
         <Text style={sheetStyles.headerLabel}>FIELD ENTRY</Text>
 
         <View style={sheetStyles.headerRight}>
-          {editing ? (
+          {isOwn && editing ? (
             <TouchableOpacity
               style={[sheetStyles.headerSaveBtn, saving && sheetStyles.headerBtnDisabled]}
               onPress={handleSave}
@@ -555,7 +561,7 @@ function PinSheet({
                 {saving ? 'SAVING…' : 'SAVE'}
               </Text>
             </TouchableOpacity>
-          ) : (
+          ) : isOwn ? (
             <>
               <TouchableOpacity style={sheetStyles.iconBtn} onPress={startEdit}>
                 <Text style={sheetStyles.editBtnText}>EDIT</Text>
@@ -564,6 +570,10 @@ function PinSheet({
                 <Text style={sheetStyles.deleteBtnText}>DEL</Text>
               </TouchableOpacity>
             </>
+          ) : (
+            <View style={sheetStyles.friendBadge}>
+              <Text style={sheetStyles.friendBadgeText}>FRIEND</Text>
+            </View>
           )}
         </View>
       </View>
@@ -1009,6 +1019,19 @@ const sheetStyles = StyleSheet.create({
     letterSpacing: 0.8,
     fontWeight: '700',
   },
+  friendBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderWidth: 1.5,
+    borderColor: RC.inkRed,
+    backgroundColor: RC.linen,
+  },
+  friendBadgeText: {
+    fontSize: 9,
+    color: RC.inkRed,
+    fontWeight: '700',
+    letterSpacing: 1.5,
+  },
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1042,16 +1065,37 @@ export default function MapScreen() {
     useCallback(() => {
       if (!session) return;
       (async () => {
-        const { data, error } = await supabase
-          .from('entries')
-          .select('id, latitude, longitude, title, body, photo_url, photos, created_at')
-          .eq('user_id', session.user.id);
+        const FIELDS = 'id, latitude, longitude, title, body, photo_url, photos, created_at';
 
-        if (error) {
-          console.error('[MapScreen] failed to fetch entries:', error.message);
-          return;
+        const [ownResult, friendResult] = await Promise.all([
+          supabase
+            .from('entries')
+            .select(FIELDS)
+            .eq('user_id', session.user.id),
+          supabase
+            .from('entries')
+            .select(FIELDS)
+            .neq('user_id', session.user.id)
+            .eq('visibility', 'friends'),
+        ]);
+
+        if (ownResult.error) {
+          console.error('[MapScreen] failed to fetch own entries:', ownResult.error.message);
         }
-        setPins((data as EntryPin[]) ?? []);
+        if (friendResult.error) {
+          console.error('[MapScreen] failed to fetch friend entries:', friendResult.error.message);
+        }
+
+        const ownPins = ((ownResult.data ?? []) as EntryPin[]).map((p) => ({
+          ...p,
+          isFriend: false,
+        }));
+        const friendPins = ((friendResult.data ?? []) as EntryPin[]).map((p) => ({
+          ...p,
+          isFriend: true,
+        }));
+
+        setPins([...ownPins, ...friendPins]);
       })();
     }, [session]),
   );
@@ -1120,6 +1164,7 @@ export default function MapScreen() {
           <PinSheet
             key={selectedPin.id}
             pin={selectedPin}
+            isOwn={!selectedPin.isFriend}
             onClose={closeSheet}
             onDelete={handleDeletePin}
             onSave={handleSavePin}

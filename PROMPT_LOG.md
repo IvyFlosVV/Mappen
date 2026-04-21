@@ -515,3 +515,12 @@ Sections:
 Map integration:
 When fetching entries for the map, also fetch accepted friends' entries where visibility = 'friends'. Show friend pins in a different color from own pins (own: dark green, friends: dark red).
 Use the existing Supabase auth for user identity. All endpoints should verify the JWT from the Authorization header. Do not change any existing screens or styling.
+
+
+#Debug
+[FriendsScreen] is throwing "Network request failed" on fetchFriendsData (friends.tsx:95). This is a network-level failure, not an HTTP error. Debug in this order:
+Log the exact URL being fetched in fetchFriendsData right before the fetch call
+Check that the base URL in the API config points to the correct Render backend URL (not localhost) when running on a physical device
+Check that the /api/friends endpoint exists in the Express router and is mounted correctly in server.js/index.js
+Check that the JWT from Supabase session is being attached as Authorization: Bearer <token> in the request headers
+Fix whichever of these is the root cause. Do not change any other behavior.
