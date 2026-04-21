@@ -285,6 +285,7 @@ Build the auth piece, nothing else yet.
 **Important**: before redirecting, make sure the AuthProvider is mounted above the navigation. Common pitfall: trying to read context inside a layout that itself provides the context.
 
 CHECKPOINT 2B — STOP. Tell me:
+
 - File tree of what was created/modified (max 3 levels, exclude node_modules)
 - What I should see when I reload the Expo app (e.g., "login screen, blank fields")
 - Exact steps to manually test signup, signin, signout — including what I should see at each step
@@ -445,3 +446,72 @@ Use StyleSheet.create, NOT inline styles. Match the existing styling vibe of the
   - Any TypeScript errors you see
 
 Do not run the app — I'll do that after I fill in the state machine.
+
+
+##Fixes
+1. Even if i uploaded a picture the icon is sill just a pin, i want something like apple album default (second picture) + name.
+2. You see how after adding there is only a back to map option? I want another that says add another pin. I also want confetti after successfully adding a place.
+3. The main page of 'map' currently only have that map and pins, I want 1/3 space at the bottom to be a pop up window after the user clicks on a pin, showing the name and text and the uploaded picture (that can be clicked and saved), working as a journal.
+I want to add a warning note after submission at entry page if a user is at the same exact place (you can allow a difference range) where a previous entry have already been recorded. could be: ⚠️ Seems like you have already pinned this place...still proceed? y/n
+put a refresh location button on new entry page next to Longitude and latitude. current version cannot do that
+
+##Photo uploading bug
+somehow I cannot seem to load the photos in map...and clicking on those places does not cause the details window to pop up either.
+I can see the uploads in supabase, but they are all 0 bytes.
+for an entry that does not have pictures, still give it a name and a red pin like in your previous version. the current version is only a blue dot, not friendly for users
+
+##Image numbers
+the current app only allow one image upload at a time--I would like it to enable multiple image uploads.
+for the map pin front cover used image, default is the first picture uploaded, however enable user to edit cover image in the details tab
+
+#UI Redesign (Artistic step)
+Refine the current blue and white UI into a systematic, polished 'Retro Constructivist' design. The entire layout must be re-organized to feel deliberate, precise, and archivist-focused, balancing structured logic with high-character visuals.
+Palette: Shift from the current palette to a rich, textured array of 'archivist' colors. Primary background should be warm beiges and natural cream. Accents must use deep hunter greens, rich ink reds, and precise graphite greys, all with slightly aged, high-quality print textures.
+Typography: Use a combination of rigid, geometric sans-serif fonts for titles and interface elements (e.g., modern interpretations of Futura or Erbar Grotesk), and structured, readable serifs for the journaling content. Treat text as a design element itself, with high-density blocks that are systematic and functional.
+Layout: The entire UI must feel systematic and engineered. Prioritize a clear, stable grid. Break up standard container layouts with intersecting vertical and horizontal lines of precise width. Instead of standard cards, create asymmetric, interpenetrating geometric forms that define the functional areas. Text blocks and visual elements should align perfectly with this 'engineered' grid.
+Visuals: Replace standard icons with schematic, blueprint-like illustrations. Any drawings (like maps or pin icons) must use clean lines with flat or simplified geometric coloring. Incorporate subtle, high-quality, tactile-digital textures, like glassmorphism or neumorphism, for interactive panels, ensuring they feel both precisely engineered and deeply integrated into the overarching Retro Constructivist theme.
+
+##Technical Fix: Keyboard Avoiding View & Header Polish
+
+Keyboard Handling:
+Implement a KeyboardAvoidingView (or equivalent for the framework) for the "Field Entry" sheet.
+When the keyboard is active, the entire content area (Title, Notes, Photos) must be scrollable.
+Ensure the text input being edited is automatically scrolled into view above the keyboard so it is never obstructed.
+
+Header Button Consistency:
+SAVE Button: Instead of just a box, make it a solid Deep Green block with Beige text.
+CANCEL Button: Change it from plain text to a solid Red block with Beige text (matching the "Go Back" logic from the warning page).
+Alignment: Both buttons should be the same height and aligned to the far edges of the top bar, maintaining the 1px charcoal grid line underneath.
+
+Input Field Refinement:
+Title Field: Make the underline thicker (2px) and Charcoal color.
+Notes Area: Ensure the "What happened here?" text area has enough padding and a clear 1px Charcoal border so it feels like a defined "entry block" even when scrolling.
+Photo Grid: When the keyboard is open, ensure the user can still scroll down to see the "ADD PHOTO" section.
+
+
+Implement the Friends feature for Mappen. Here is the full spec:
+Data model:
+
+profiles table has invite_code (unique, generated at signup)
+friendships table: (user_a uuid, user_b uuid, status text) with convention user_a < user_b to avoid duplicate rows, status is 'pending' or 'accepted'
+
+Backend (Express):
+Add these endpoints:
+
+GET /api/friends — return accepted friends for current user (join profiles to get username + invite_code)
+POST /api/friends/request — body: { invite_code } — look up the user with that invite code, create a friendship row with status 'pending'. Error if: code not found, trying to add yourself, friendship already exists.
+POST /api/friends/accept — body: { user_id } — update friendship status to 'accepted'
+GET /api/friends/pending — return incoming pending requests (people who added me, I haven't accepted yet)
+
+Frontend — Friends screen:
+Match the existing app's 复古构成主义 visual style (cream background, dark green + dark red accents, monospaced uppercase labels).
+Sections:
+
+"YOUR CODE" — display current user's invite_code in a large styled box with a copy-to-clipboard button
+"ADD FRIEND" — text input + submit button to enter a friend's invite code
+"PENDING" — list of incoming requests with Accept button per row
+"FRIENDS" — list of accepted friends (username)
+
+Map integration:
+When fetching entries for the map, also fetch accepted friends' entries where visibility = 'friends'. Show friend pins in a different color from own pins (own: dark green, friends: dark red).
+Use the existing Supabase auth for user identity. All endpoints should verify the JWT from the Authorization header. Do not change any existing screens or styling.

@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Link } from 'expo-router';
 import { useAuth } from '@/src/lib/auth';
+import { Fonts, RC } from '@/constants/theme';
 
 export default function LoginScreen() {
   const { signIn } = useAuth();
@@ -32,14 +33,24 @@ export default function LoginScreen() {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
+      {/* Top rule */}
+      <View style={styles.topRule} />
+
       <View style={styles.form}>
-        <Text style={styles.title}>Mappen</Text>
-        <Text style={styles.subtitle}>Sign in to your account</Text>
+        {/* Title block */}
+        <View style={styles.titleBlock}>
+          <View style={styles.titleAccentBar} />
+          <Text style={styles.title}>MAPPEN</Text>
+        </View>
+
+        <Text style={styles.subtitle}>FIELD ARCHIVIST PORTAL</Text>
+
+        <View style={styles.divider} />
 
         <TextInput
           style={styles.input}
-          placeholder="Email"
-          placeholderTextColor="#999"
+          placeholder="EMAIL ADDRESS"
+          placeholderTextColor={RC.rule}
           autoCapitalize="none"
           autoCorrect={false}
           keyboardType="email-address"
@@ -49,15 +60,20 @@ export default function LoginScreen() {
         />
         <TextInput
           style={styles.input}
-          placeholder="Password"
-          placeholderTextColor="#999"
+          placeholder="PASSWORD"
+          placeholderTextColor={RC.rule}
           secureTextEntry
           value={password}
           onChangeText={setPassword}
           editable={!submitting}
         />
 
-        {error !== null && <Text style={styles.error}>{error}</Text>}
+        {error !== null && (
+          <View style={styles.errorRow}>
+            <View style={styles.errorAccent} />
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        )}
 
         <TouchableOpacity
           style={[styles.button, submitting && styles.buttonDisabled]}
@@ -65,18 +81,23 @@ export default function LoginScreen() {
           disabled={submitting}
         >
           {submitting ? (
-            <ActivityIndicator color="#fff" />
+            <ActivityIndicator color={RC.parchment} />
           ) : (
-            <Text style={styles.buttonText}>Sign In</Text>
+            <Text style={styles.buttonText}>ENTER ARCHIVE</Text>
           )}
         </TouchableOpacity>
 
+        <View style={styles.divider} />
+
         <Link href="/(auth)/signup" asChild>
           <TouchableOpacity style={styles.linkContainer}>
-            <Text style={styles.linkText}>Don't have an account? Sign up</Text>
+            <Text style={styles.linkText}>NEW ARCHIVIST?  CREATE ACCOUNT →</Text>
           </TouchableOpacity>
         </Link>
       </View>
+
+      {/* Bottom rule */}
+      <View style={styles.topRule} />
     </KeyboardAvoidingView>
   );
 }
@@ -84,63 +105,99 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: RC.parchment,
     justifyContent: 'center',
   },
+  topRule: {
+    height: 3,
+    backgroundColor: RC.hunter,
+  },
   form: {
-    paddingHorizontal: 24,
-    gap: 12,
+    flex: 1,
+    paddingHorizontal: 28,
+    paddingVertical: 48,
+    gap: 16,
+    justifyContent: 'center',
+  },
+  titleBlock: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    marginBottom: 2,
+  },
+  titleAccentBar: {
+    width: 6,
+    height: 46,
+    backgroundColor: RC.inkRed,
   },
   title: {
-    fontSize: 32,
+    fontSize: 44,
     fontWeight: '700',
-    color: '#111',
-    textAlign: 'center',
-    marginBottom: 4,
+    color: RC.ink,
+    letterSpacing: 10,
   },
   subtitle: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 8,
+    fontSize: 9,
+    color: RC.dust,
+    letterSpacing: 3.5,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: RC.rule,
   },
   input: {
-    height: 48,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    fontSize: 16,
-    color: '#111',
-    backgroundColor: '#fafafa',
-  },
-  error: {
-    color: '#d32f2f',
+    height: 50,
+    borderBottomWidth: 1.5,
+    borderBottomColor: RC.rule,
+    paddingHorizontal: 0,
     fontSize: 14,
-    textAlign: 'center',
+    color: RC.ink,
+    backgroundColor: 'transparent',
+    letterSpacing: 0.5,
+    fontFamily: Fonts?.mono ?? 'Courier New',
+  },
+  errorRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
+  errorAccent: {
+    width: 3,
+    height: '100%',
+    backgroundColor: RC.inkRed,
+    minHeight: 16,
+  },
+  errorText: {
+    color: RC.inkRed,
+    fontSize: 12,
+    fontFamily: Fonts?.mono ?? 'Courier New',
+    flex: 1,
+    letterSpacing: 0.3,
   },
   button: {
-    height: 48,
-    backgroundColor: '#2563eb',
-    borderRadius: 8,
+    height: 50,
+    backgroundColor: RC.hunter,
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 4,
   },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
+  buttonDisabled: { opacity: 0.5 },
   buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    color: RC.parchment,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 3,
   },
   linkContainer: {
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: 6,
   },
   linkText: {
-    color: '#2563eb',
-    fontSize: 15,
+    color: RC.dust,
+    fontSize: 9,
+    letterSpacing: 1.5,
+    fontWeight: '700',
   },
 });
