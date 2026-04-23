@@ -4,118 +4,73 @@ A geographic journal phone app for iOS and Android. Pin memories to the places t
 
 > *Where things happen, mapped.*
 
-Built for CMU 15-113 Project 3 with Expo, React Native, Express, and Supabase.
+**Author:** Ivy Weng
+**Course:** Carnegie Mellon 15-113, Effective Coding with AI — Project 3
+**Stack:** Expo / React Native · Express · Supabase · react-native-maps
 
 ---
 
-## What it does
+## Table of contents
 
-Mappen is a journal where every entry is anchored to a physical location. When you create an entry, the app captures your current GPS coordinates and locks them in — you can edit the photo, title, body, and timestamp later, but **not** the location. This design choice keeps the map honest: an "I was here" pin always means you were actually there.
+1. [What the project does](#what-the-project-does)
+2. [How to use it](#how-to-use-it)
+3. [Features I'm most proud of](#features-im-most-proud-of)
+4. [How to run it locally](#how-to-run-it-locally)
+5. [How secrets are handled](#how-secrets-are-handled)
+6. [Architecture](#architecture)
+7. [What I wrote vs. what AI helped with](#what-i-wrote-vs-what-ai-helped-with)
+8. [Project 3 requirements](#project-3-requirements)
+
+---
+
+## What the project does
+
+Mappen is a journal where every entry is anchored to a physical location. When you create an entry, the app captures your current GPS coordinates and **locks** them in — you can edit the photo, title, body, and timestamp later, but **not** the location. This keeps the map honest: an "I was here" pin always means you were actually there.
 
 The app has two complementary views of the same data:
 
 - **Map view** — spatial. Pins scattered across the world, each one a memory.
 - **Journal view** — chronological. A reverse-time list of everything you've pinned.
 
-Entries can be empty ("I was here" pins with no photo or text), photo-only, text-only, or full. Each entry has a visibility setting: **private** (only you) or **friends-only** (you and your accepted friends). There is no public feed — no moderation, no strangers, no algorithm.
+Entries can be blank ("I was here" pins with no photo or text), photo-only, text-only, or full. Each entry has a visibility setting: **private** (only you) or **friends-only** (you and your accepted friends). There is no public feed — no moderation, no strangers, no algorithm.
 
-Friends are added via **invite codes**. Each user gets a short unique code on signup; you exchange codes to send/accept friend requests. Accepted friends' entries appear as pins of a different color on your map.
-
----
-
-## Features
-
-- Sign up / sign in with email (Supabase Auth)
-- Create an entry at your current GPS location with optional photo + title + body
-- Private or friends-only visibility, set per entry
-- Map view with own pins and friend pins (color-coded)
-- Chronological journal view with edit and delete
-- Friends system: invite code display, incoming request queue, accept/reject, accepted friends list
-- Works end-to-end on a physical iPhone via Expo Go
+Friends are added via **invite codes**. Each user gets a short unique code on signup; friends exchange codes to send and accept friend requests. Accepted friends' friends-only entries appear as pins of a different color on your map.
 
 ---
 
-## Architecture
+## How to use it
 
-```
-┌──────────────────────────┐
-│  Expo / React Native app │   ← runs on physical phone via Expo Go
-│  (app/)                  │
-└────────────┬─────────────┘
-             │
-             │  HTTPS (JWT in Authorization header)
-             │
-             ▼
-┌──────────────────────────┐
-│  Express + TypeScript    │   ← deployed on Render
-│  (server/)               │
-└────────────┬─────────────┘
-             │
-             │  Supabase service key
-             │
-             ▼
-┌──────────────────────────┐
-│  Supabase                │
-│  • Postgres (+ RLS)      │
-│  • Storage (photos)      │
-│  • Auth (email/password) │
-└──────────────────────────┘
-```
-
-**Project 3 requirements hit (≥ 2 required):**
-
-1. Frontend ↔ backend communication (Expo app → Express on Render)
-2. Thoughtful third-party API usage with secure keys (Supabase, Expo Location, Expo Image Picker)
-3. Use of a database (Postgres via Supabase, with row-level security)
-4. Runs on a physical phone (Expo SDK 54, tested on iPhone via Expo Go)
-
-### Data model
-
-Three tables in Supabase Postgres:
-
-- **`profiles`** — `id`, `username`, `invite_code`. Row created automatically on signup via a `handle_new_user()` trigger.
-- **`entries`** — `id`, `user_id`, `latitude`, `longitude`, `location_name`, `photo_url`, `title`, `body`, `visibility ('private' | 'friends')`, `created_at` (editable), `updated_at`.
-- **`friendships`** — `user_a`, `user_b`, `status ('pending' | 'accepted')`. Enforces the invariant `user_a < user_b` to prevent duplicate rows for the same pair.
-
-### Design choices worth calling out
-
-- **Visibility is enforced at the database layer via Row-Level Security**, not in application code. Even if a bug slipped into the Express server, Postgres itself would refuse to return entries the user isn't authorized to see. Defense in depth.
-- **GPS is locked at creation, not editable.** Editing the location would break the app's core promise. Text and photos represent what *happened*; coordinates represent *where* — and "where" shouldn't be rewritable.
-- **Entry creation runs on a hand-written finite state machine** (9 states, 14 action types) rather than a tangle of `useState` booleans. It makes impossible states unrepresentable — you cannot be simultaneously `uploading_photo` and `submit_failed`, for example — and it's the substantial hand-written core of the codebase.
-- **The `user_a < user_b` friendship convention** means the pair {Alice, Bob} is stored as exactly one row regardless of who initiated, avoiding duplicate-row bugs in both writes and reads.
-- **Dual views of the same data (map + journal)** treat location as a first-class axis alongside time. Apple Photos and WeChat Moments are chronological-only; Mappen's map view exists because "where you were" is sometimes more memorable than "when."
+1. Sign up with an email and password. A profile with a unique invite code is created automatically.
+2. Open the **map** tab. Tap the floating **+** to create an entry at your current location.
+3. On the new-entry screen, optionally attach a photo and/or a title and body. Pick **private** or **friends-only**. Submit.
+4. Tap any pin on the map to view the entry. You can edit or delete your own entries.
+5. Use the **journal** tab to read your entries chronologically.
+6. Open the **friends** tab to find your invite code and paste a friend's code to send a request. Pending requests appear on the recipient's friends tab; once accepted, the friend's friends-only pins appear on your map (in a different color from your own).
 
 ---
 
-## Repo layout
+## Features I'm most proud of
 
-```
-Mappen/
-├── app/                 # Expo / React Native frontend
-│   ├── app/             # Expo Router screens (map, new, detail, journal, friends, auth)
-│   ├── components/
-│   ├── utils/supabase.ts
-│   └── .env             # EXPO_PUBLIC_* (gitignored)
-├── server/              # Express + TypeScript backend
-│   ├── src/index.ts     # entry point
-│   └── .env             # SUPABASE_URL, SUPABASE_SECRET_KEY (gitignored)
-├── docs/
-│   └── SUPABASE_SETUP.md
-├── README.md            # you are here
-├── PROMPT_LOG.md        # verbatim Cursor prompts + outcomes
-└── REFLECTION.md        # process reflection (written by hand, no AI)
-```
+**GPS-locked entries.** When an entry is created, coordinates are captured and never allowed to change — not by the user, not by the edit screen, not by any client code. Editing the location would break the app's core promise, so the schema and UI simply don't expose that path.
+
+**Visibility enforced at the database layer.** Private/friends-only filtering is implemented as Supabase **row-level security policies** — so the Postgres layer itself refuses to return entries the viewer isn't authorized to see. The Express server couldn't leak data even if a buggy query tried. Defense in depth, not application-layer hope.
+
+**Hand-written finite state machine for entry creation.** The new-entry flow has nine distinct states (`idle`, `fetching_gps`, `gps_failed`, `ready`, `picking_photo`, `uploading_photo`, `submitting`, `submit_failed`, `done`) and fourteen action types, all in a discriminated-union TypeScript reducer I wrote and debugged by hand. This prevents the whole class of "impossible UI" bugs you get when you try to model a workflow like this with five or six `useState` booleans.
+
+**Dual map + journal views.** Apple Photos and WeChat Moments both have location metadata but are chronological-only. Mappen treats *where* as a first-class axis alongside *when*, on the premise that place is sometimes more memorable than time.
+
+**Friendship schema invariant.** The `friendships` table enforces `user_a < user_b` as a rule, so the pair {Alice, Bob} is stored as exactly one row regardless of who initiated the request. This makes both writes and lookups duplicate-free without any application-level deduplication.
 
 ---
 
-## Running it locally
+## How to run it locally
 
 ### Prerequisites
 
 - Node 20+
-- Expo Go on a physical iPhone (iOS) or Android device
-- A Supabase project (free tier is fine)
-- Phone and laptop on the same Wi-Fi network
+- **Expo Go** installed on a physical iPhone or Android device
+- A Supabase project (free tier is sufficient)
+- Phone and laptop on the same Wi-Fi network (for local dev) — or skip this and use the deployed Render backend
 
 ### 1. Clone and install
 
@@ -128,24 +83,23 @@ cd ../server && npm install
 
 ### 2. Set up Supabase
 
-Follow `docs/SUPABASE_SETUP.md` — it contains the full schema, RLS policies, and the `handle_new_user()` trigger as a single SQL block to paste into the Supabase SQL Editor.
+Follow [`docs/SUPABASE_SETUP.md`](./docs/SUPABASE_SETUP.md). It contains the full schema, RLS policies, and the `handle_new_user()` trigger as a single SQL block to paste into the Supabase SQL Editor.
 
-Make sure you:
+Also, in the Supabase dashboard:
 
-- Disable email confirmation under **Authentication → Providers → Email** (otherwise sign-up flow blocks on an email that never arrives)
-- Grab your project's **publishable key** and **secret key** — these go in the `.env` files below
+- **Authentication → Providers → Email**: disable the email-confirmation requirement. Otherwise sign-up blocks on an email that never arrives.
 
 ### 3. Create `.env` files
 
-**`app/.env`** (frontend — `EXPO_PUBLIC_` is an Expo convention that exposes vars to the client bundle):
+**`app/.env`** (frontend — `EXPO_PUBLIC_` is the Expo convention for client-bundled vars):
 
 ```
 EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 EXPO_PUBLIC_SUPABASE_KEY=sb_publishable_xxxxxxxxxxxxxxxxxxxx
-EXPO_PUBLIC_API_URL=http://localhost:3000
+EXPO_PUBLIC_API_URL=http://<your-laptop-LAN-IP>:3000
 ```
 
-For testing on a physical phone, replace `localhost` with your laptop's LAN IP (e.g. `http://192.168.1.42:3000`) or with the deployed Render URL (see Deployment below).
+For testing on a physical phone, `localhost` won't work — use your laptop's LAN IP (e.g. `http://192.168.1.42:3000`) or the deployed Render URL.
 
 **`server/.env`** (backend — never prefixed with `EXPO_PUBLIC_`, never bundled into the client):
 
@@ -163,7 +117,7 @@ In one terminal:
 cd server && npm run dev
 ```
 
-You should see `listening on :3000`. Verify with:
+You should see the server listening on port 3000. Verify:
 
 ```bash
 curl http://localhost:3000/health
@@ -176,55 +130,135 @@ In a second terminal:
 cd app && npx expo start
 ```
 
-Scan the QR code with the Expo Go app on your phone.
+Scan the QR code with Expo Go on your phone.
 
----
+### Deployment
 
-## Deployment
-
-### Backend (Render)
+The backend is deployed on Render (free tier):
 
 - **Root Directory:** `server`
 - **Build Command:** `npm install && npm run build`
 - **Start Command:** `npm start`
 - **Environment Variables:** `SUPABASE_URL`, `SUPABASE_SECRET_KEY` (Render injects `PORT` automatically)
 
-The `build` script runs `tsc` to compile TypeScript into `dist/`, which `start` then runs with plain Node. Render's free tier spins down after 15 minutes of inactivity — the first request after spin-down takes ~30 seconds.
+Render's free tier spins down after 15 minutes of inactivity — the first request after spin-down takes ~30 seconds to wake the dyno.
 
-### Frontend
-
-The Expo app isn't "deployed" in the web sense. It runs on a physical phone via Expo Go. To share it with someone else's phone, either publish with `eas update` or have them scan your Expo Go QR code.
+The frontend isn't "deployed" in the web sense — Expo/React Native apps run on a physical phone via Expo Go. To test on someone else's phone, they install Expo Go and scan my dev server's QR code.
 
 ---
 
-## Secrets
+## How secrets are handled
 
-Secrets are never committed. Three kinds exist:
+No secret is ever committed to the repo. Three kinds exist:
 
-| Secret | Lives in | Safe to commit? |
-|---|---|---|
-| Supabase **publishable key** (`sb_publishable_…`) | `app/.env` | No — it's designed to be safe in client code, but still gitignored to avoid churn on rotation |
-| Supabase **secret key** (`sb_secret_…`) | `server/.env` (local) + Render dashboard | **Absolutely not** — full admin access to the database |
-| `EXPO_PUBLIC_API_URL` | `app/.env` | No — it's not sensitive but lives alongside the keys |
+| Secret | Lives in | Committed? | Why |
+|---|---|---|---|
+| Supabase **publishable key** (`sb_publishable_…`) | `app/.env` | No | Designed to be safe in client code, but gitignored so rotation doesn't churn the repo |
+| Supabase **secret key** (`sb_secret_…`) | `server/.env` locally, Render dashboard in production | **Never** | Grants full admin access to the database, bypassing RLS |
+| `EXPO_PUBLIC_API_URL` | `app/.env` | No | Not sensitive, but lives alongside the keys |
 
-Both `.env` files are listed in `.gitignore`. Example templates are in `app/.env.example` and `server/.env.example`.
+Both `.env` files are listed in `.gitignore`. Example templates with blank values are committed as `app/.env.example` and `server/.env.example`.
+
+The publishable key was accidentally exposed once in a chat during development and was rotated immediately via the Supabase dashboard. That incident is documented in `PROMPT_LOG.md`.
+
+---
+
+## Architecture
+
+```
+┌──────────────────────────┐
+│  Expo / React Native app │   ← runs on a physical phone via Expo Go
+│  (app/)                  │
+└────────────┬─────────────┘
+             │
+             │  HTTPS (Supabase JWT in Authorization header)
+             │
+             ▼
+┌──────────────────────────┐
+│  Express + TypeScript    │   ← deployed on Render
+│  (server/)               │
+└────────────┬─────────────┘
+             │
+             │  Supabase service-role key (never leaves the server)
+             │
+             ▼
+┌──────────────────────────┐
+│  Supabase                │
+│  • Postgres (+ RLS)      │
+│  • Storage (photos)      │
+│  • Auth (email/password) │
+└──────────────────────────┘
+```
+
+### Data model
+
+Three tables in Supabase Postgres:
+
+- **`profiles`** — `id`, `username`, `invite_code`. A row is created automatically on signup by the `handle_new_user()` trigger, which appends a 4-character random suffix to avoid username collisions.
+- **`entries`** — `id`, `user_id`, `latitude`, `longitude`, `location_name`, `photo_url`, `title`, `body`, `visibility ('private' | 'friends')`, `created_at` (editable), `updated_at`.
+- **`friendships`** — `user_a`, `user_b`, `status ('pending' | 'accepted')`. Enforces `user_a < user_b` so each pair is stored exactly once regardless of who initiated the request.
+
+### Repo layout
+
+```
+Mappen/
+├── app/                 # Expo / React Native frontend
+│   ├── app/             # Expo Router screens (map, new, detail, journal, friends, auth)
+│   ├── components/
+│   ├── utils/supabase.ts
+│   └── .env.example
+├── server/              # Express + TypeScript backend
+│   ├── src/index.ts     # entry point; routes live here
+│   └── .env.example
+├── docs/
+│   └── SUPABASE_SETUP.md
+├── README.md            # you are here
+├── PROMPT_LOG.md        # verbatim Cursor prompts + outcomes
+└── REFLECTION.md        # process reflection, hand-written (no AI)
+```
 
 ---
 
 ## What I wrote vs. what AI helped with
 
-I used **Cursor Pro in agent mode** (Claude Sonnet 4) for scaffolding, JSX render functions, and styling. I **hand-wrote** the core logic I need to be able to defend in an oral exam:
+Per the assignment's requirement that I *"substantially modify or write from scratch"* at least one meaningful part of the code, this section names the split explicitly.
 
-- The entry-creation finite state machine (reducer + types) in `app/app/new.tsx`
-- The two `useEffect` hooks that wire the reducer to GPS fetch and Supabase writes
-- The Supabase schema and RLS policies
+**AI-assisted (Cursor Pro agent mode, Claude Sonnet 4):**
+- Initial Expo scaffolding and Expo Router setup
+- JSX render functions and React Native stylesheets
+- Express route handlers for friend-request flow and entry CRUD (after I specified the endpoints)
+- Deployment troubleshooting (Render build config, TypeScript → JS compilation)
 
-Details — including verbatim Cursor prompts, decisions that were revisited, and bugs fixed — are in `PROMPT_LOG.md`. My personal reflection on the process (written entirely by hand) is in `REFLECTION.md`.
+**Written by hand:**
+- The entry-creation **finite state machine**: reducer + TypeScript discriminated-union action types in `app/app/new.tsx`. 9 states, 14 actions. Debugged several TypeScript narrowing bugs (spread syntax is invalid when changing the discriminant `status` field — fields must be listed explicitly).
+- The two `useEffect` hooks that subscribe to the reducer state and perform side effects (GPS fetch on mount, Supabase insert on `status === 'submitting'`). The reducer declares intent; the effects execute it. Navigation side effects like `router.back()` live in the effect, never in the reducer.
+- The Supabase **schema and RLS policies**, including the `handle_new_user()` trigger and the `user_a < user_b` friendship invariant.
+
+The rationale behind each of these hand-written pieces — and the bugs I introduced and fixed along the way — is documented in [`PROMPT_LOG.md`](./PROMPT_LOG.md) (for Cursor sessions) and [`REFLECTION.md`](./REFLECTION.md) (for my personal write-up).
+
+---
+
+## Project 3 requirements
+
+The project satisfies four of the "at least two" technical requirements from the assignment brief:
+
+1. **Frontend ↔ backend communication** — Expo app talks to Express on Render over HTTPS with JWT auth.
+2. **Thoughtful third-party API usage with secure keys** — Supabase (with the secret key held server-side only), Expo Location, Expo Image Picker.
+3. **Use of a database** — Postgres via Supabase, with row-level security policies as the authoritative visibility filter.
+4. **Runs on a physical phone** — Expo SDK 54, tested end-to-end on iPhone via Expo Go.
+
+Deliverables (all in repo root):
+
+- `README.md` — this file
+- `PROMPT_LOG.md` — verbatim Cursor prompts used during development, with outcomes
+- `REFLECTION.md` — hand-written process reflection
+
+A short demo video and portfolio link are submitted separately via the Project 3 Google form.
 
 ---
 
 ## Acknowledgments
 
 - **CMU 15-113 Effective Coding with AI** — project framing and the constraint to write substantial code by hand
-- **Supabase** — auth, Postgres, storage, and RLS all in one
-- **Expo** — the only reason a solo ~8-hour project can ship to a real phone
+- **Supabase** — auth, Postgres, storage, and RLS in one service
+- **Expo** — the reason a solo ~8-hour project can ship to a real phone at all
